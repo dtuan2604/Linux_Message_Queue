@@ -4,6 +4,7 @@
 
 
 #define MAX_PROCESS 20
+#define SHM_SIZE 1024
 
 
 
