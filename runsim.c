@@ -7,9 +7,9 @@
 #include <sys/ipc.h>
 #include <sys/shm.h>
 
-
+int nLicense;
 char* programname;
-
+key_t key = 2604;
 
 int validNum(char* num){
         int size = strlen(num);
@@ -49,9 +49,36 @@ void delshm(int shmid){
 	}	
 	return;
 }
+void runProcess(int nLicense){
+	int shmid;
+	int *shm;
+	int test;
+        shmid = shmget(key, SHM_SIZE, IPC_CREAT | 0666);
 
+        if(shmid < 0){
+        //        perror("shmget");
+           	fprintf(stderr,"%s: ",programname);
+                perror("Error:");
+		exit(1);
+        }
+
+        shm = shmat(shmid, NULL, 0);
+
+        if(shm == (int *) -1){
+                fprintf(stderr,"%s: ",programname);
+                perror("Error:");
+                exit(1);
+        }
+
+        *shm = nLicense;
+        test = *shm;
+        printf("Check share memory: %d.\n", test);
+
+        dtshm(shm);
+        delshm(shmid);
+
+}
 int main(int argc, char** argv){
-	int nLicense;
 	programname = argv[0];
 
 	if((argc != 2) ){
@@ -68,35 +95,9 @@ int main(int argc, char** argv){
 		}else
 			return EXIT_FAILURE;
 	}
-
-	int shmid;  	
-	key_t key;
-	int *shm;
-	int test;
-
-	key = 2604;
-
-	shmid = shmget(key, SHM_SIZE, IPC_CREAT | 0666);
-
-	if(shmid < 0){
-		perror("shmget");
-		exit(1);
-	} 
-
-	shm = shmat(shmid, NULL, 0);
-
-	if(shm == (int *) -1){
-		fprintf(stderr,"%s: ",programname);
-		perror("Error:");
-		exit(1);
-	}
-
-	*shm = nLicense;
-	test = *shm;
-	printf("Check share memory: %d.\n", test);
-	dtshm(shm);	
-	delshm(shmid);
-
+	
+	runProcess(nLicense); 
+	
 	return EXIT_SUCCESS;
 
 
