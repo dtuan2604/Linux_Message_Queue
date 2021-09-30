@@ -1,11 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <ctype.h>
 #include "config.h"
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
+#include <sys/wait.h>
+
 
 int nLicense;
 char* programname;
@@ -33,22 +36,58 @@ int inRange(char* num){
 
 }
 
-void dtshm(int* shm){
+void dt_shm(int* shm){
 	int dt_return = shmdt(shm);
 	if(dt_return == -1){
 		fprintf(stderr,"%s: ",programname);
-		perror("Error:");
+		perror("Error");
 	}
 	return;
 }
-void delshm(int shmid){
+void del_shm(int shmid){
 	int ctl_return = shmctl(shmid, IPC_RMID, NULL);
 	if(ctl_return == -1){
 		fprintf(stderr,"%s: ",programname);
-                perror("Error:");
+                perror("Error at delete function");
 	}	
 	return;
 }
+void createChild(){
+        pid_t childPid = fork();
+        int status; 
+	if(childPid < 0){
+                fprintf(stderr,"%s: ",programname);
+                perror("Error");
+                exit(1);
+        }else if(childPid == 0){
+                int shmid;
+                int *shm;
+                int test;
+                shmid = shmget(key, SHM_SIZE, 0666);
+                if(shmid < 0){
+                        fprintf(stderr,"%s: ",programname);
+                        perror("Error");
+                        exit(1);
+                }
+                shm = shmat(shmid, NULL, 0);
+                if(shm == (int *) -1){
+                        fprintf(stderr,"%s: ",programname);
+                        perror("Error");
+                        exit(1);
+                }
+
+                test = *shm;
+                printf("Check share memory from child with process id %d: %d.\n",getpid(), test);
+                dt_shm(shm);
+		exit(0);
+        }else{
+                printf("\nI am a parent! My process id is %d, and my child is %d.\n",getpid(),childPid);
+		waitpid(childPid, &status, 0);
+        }
+        return;
+
+}
+
 void runProcess(int nLicense){
 	int shmid;
 	int *shm;
@@ -73,9 +112,11 @@ void runProcess(int nLicense){
         *shm = nLicense;
         test = *shm;
         printf("Check share memory: %d.\n", test);
-
-        dtshm(shm);
-        delshm(shmid);
+	
+	createChild();
+	
+        dt_shm(shm);
+       	del_shm(shmid);
 
 }
 int main(int argc, char** argv){
