@@ -6,7 +6,7 @@
 #define MAX_PROCESS 20
 #define SHM_SIZE 1024
 #define LOGFILE "logmsg.txt"
-
+#define MAX_TIMEOUT 5
 
 
 #endif
