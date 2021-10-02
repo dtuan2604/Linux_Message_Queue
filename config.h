@@ -7,6 +7,6 @@
 #define SHM_SIZE 1024
 #define LOGFILE "logmsg.txt"
 #define MAX_TIMEOUT 5
-
+#define BUFFER_SIZE 300
 
 #endif

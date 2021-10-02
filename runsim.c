@@ -84,7 +84,7 @@ void createChild(){
 	
                 test = *shm;
                 printf("Check share memory from child with process id %d: %d.\n",getpid(), test);
-                while(1); // Test Timeout handler
+                //while(1); // Test Timeout handler
 		dt_shm(shm);
 		exit(EXIT_SUCCESS);
         }else{
@@ -113,7 +113,9 @@ void interrupt_handler (){
 	}
 }
 void runProcess(int nLicense){
-        parentPid = getpid();
+        int numofProcesses = 0;
+
+	parentPid = getpid();
 	shm_id = shmget(key, SHM_SIZE, IPC_CREAT | 0666);
 
         if(shm_id < 0){
@@ -131,8 +133,29 @@ void runProcess(int nLicense){
                 exit(1);
         }
 
-        *shm_ptr = nLicense;
+        *shm_ptr = nLicense; //assign number of license to the shared memory
 	
+	char* commands;
+	if((commands = (char*) malloc(BUFFER_SIZE)) == NULL){
+		fprintf(stderr,"%s: failed to get commands ",programname);
+                perror("Error:");
+                exit(1);
+
+	} 	
+	char inputChar;
+	inputChar = getchar();
+	while(inputChar != EOF){
+		strncat(commands, &inputChar,1);
+		if(inputChar == '.')
+			numofProcesses++;
+		inputChar = getchar();
+
+	}	
+	printf("Commands: %s\n",commands);
+	printf("Number of commands: %d",numofProcesses);
+	free(commands);
+	exit(0);
+		
 	createChild();
 	
         dt_shm(shm_ptr);

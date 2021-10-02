@@ -11,6 +11,7 @@ char* repfactor;
 char* programname;
 char msg[70];
 #define msgsize 70
+
 int validNum(char* num){
         int size = strlen(num);
         int i = 0;
