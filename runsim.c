@@ -10,13 +10,17 @@
 #include <sys/wait.h>
 
 
-int nLicense;
 char* programname;
-key_t key = 2604;
-pid_t pidList;
+
+key_t key_license = 2604;
+key_t key_pidlist = 1708;
+pid_t *childList;
 pid_t parentPid;
-int *shm_ptr;
-int shm_id;
+
+int *shared_license;
+int shmid_license;
+int shmid_childList;
+int numofProcesses = 0; 
 
 
 int validNum(char* num){
@@ -52,96 +56,94 @@ void dt_shm(int* shm){
 void del_shm(int shmid){
 	int ctl_return = shmctl(shmid, IPC_RMID, NULL);
 	if(ctl_return == -1){
-		fprintf(stderr,"%s: failed to delete ",programname);
-                perror("Error at delete function");
+		fprintf(stderr,"%s: failed to delete %d, ",programname,shmid);
+                perror("Error");
 	}	
 	return;
 }
-void createChild(){
-        pid_t childPid = fork();
-        int status; 
-	if(childPid < 0){
-                fprintf(stderr,"%s: ",programname);
-                perror("Error");
-                exit(1);
-        }else if(childPid == 0 ){
-        	pidList = getpid();
-		int shmid;
-                int *shm;
-                int test;
-                shmid = shmget(key, SHM_SIZE, 0666);
-                if(shmid < 0){
-                        fprintf(stderr,"%s: failed to get id ",programname);
-                        perror("Error");
-                        exit(1);
-                }
-                shm = shmat(shmid, NULL, 0);
-                if(shm == (int *) -1){
-                        fprintf(stderr,"%s: failed to get pointer ",programname);
-                        perror("Error");
-                        exit(1);
-                }
-	
-                test = *shm;
-                printf("Check share memory from child with process id %d: %d.\n",getpid(), test);
-                //while(1); // Test Timeout handler
-		dt_shm(shm);
-		exit(EXIT_SUCCESS);
-        }else{
-		waitpid(childPid, &status, 0);
-   	}
-        return;
-
+void childProcess(int i, char* command){
+	printf("I am %d\n, I am taking command: %s.", getpid(), command);
+	exit(0);
 }
 void killAllProcesses(){
-	kill(pidList, SIGKILL);
-	exit(EXIT_SUCCESS); 
-
+	int i;
+	if(getpid() == parentPid){
+		for(i = 0; i < numofProcesses; i++){
+		kill(childList[i], SIGKILL); 
+		}
+	}
 }
 void alarm_handler(){
 	printf("Alarm handler is triggered\n");
-        dt_shm(shm_ptr);
-        del_shm(shm_id);
-	killAllProcesses();
+        killAllProcesses();
+        dt_shm(shared_license);
+        dt_shm(childList);
+        del_shm(shmid_license);
+        del_shm(shmid_childList);
+
 }
-void interrupt_handler (){
+void interrupt_handler(){
         if(getpid() == parentPid){
 		printf("Interrupt handler is triggered\n");
-        	dt_shm(shm_ptr);
-        	del_shm(shm_id);
-		killAllProcesses();
+        	killAllProcesses();
+		dt_shm(shared_license);
+        	dt_shm(childList);
+        	del_shm(shmid_license);
+        	del_shm(shmid_childList);
 	}
+	exit(1);
 }
-void runProcess(int nLicense){
-        int numofProcesses = 0;
-
-	parentPid = getpid();
-	shm_id = shmget(key, SHM_SIZE, IPC_CREAT | 0666);
-
-        if(shm_id < 0){
-        //        perror("shmget");
-           	fprintf(stderr,"%s: failed to get id ",programname);
+int initChildList(int numofProcesses){
+	int i;
+	int shmid = shmget(key_pidlist, sizeof(pid_t) * numofProcesses, IPC_CREAT | 0666);
+	if(shmid < 0){
+                fprintf(stderr,"%s: failed to get id ",programname);
                 perror("Error:");
-		exit(1);
+                exit(1);
         }
-
-        shm_ptr = shmat(shm_id, NULL, 0);
-
-        if(shm_ptr == (int *) -1){
+	
+	childList = (pid_t *) shmat(shmid, NULL, 0);
+	if(childList == (int *) -1){
                 fprintf(stderr,"%s: failed to get pointer ",programname);
                 perror("Error:");
                 exit(1);
         }
 
-        *shm_ptr = nLicense; //assign number of license to the shared memory
+	for( i = 0; i< numofProcesses; i++){
+		childList[i] = 0; 
+	}
+	return shmid;
+}
+void initProcess(int nLicense){
+
+	parentPid = getpid();
+	shmid_license = shmget(key_license, SHM_SIZE, IPC_CREAT | 0666);
+
+        if(shmid_license < 0){
+           	fprintf(stderr,"%s: failed to get id ",programname);
+                perror("Error:");
+		exit(1);
+        }
+
+        shared_license = shmat(shmid_license, NULL, 0);
+
+        if(shared_license == (int *) -1){
+                fprintf(stderr,"%s: failed to get pointer ",programname);
+                perror("Error:");
+                exit(1);
+        }
+
+        *shared_license = nLicense; //assign number of license to the shared memory
 	
-	char* commands;
+	char* commands = NULL;
 	if((commands = (char*) malloc(BUFFER_SIZE)) == NULL){
 		fprintf(stderr,"%s: failed to get commands ",programname);
                 perror("Error:");
                 exit(1);
-
 	} 	
+	int k;
+	for(k = 0; k <BUFFER_SIZE; k++)
+		commands[k] = '\0';	
 	char inputChar;
 	inputChar = getchar();
 	while(inputChar != EOF){
@@ -149,20 +151,49 @@ void runProcess(int nLicense){
 		if(inputChar == '.')
 			numofProcesses++;
 		inputChar = getchar();
-
 	}	
-	printf("Commands: %s\n",commands);
-	printf("Number of commands: %d",numofProcesses);
-	free(commands);
-	exit(0);
-		
-	createChild();
 	
-        dt_shm(shm_ptr);
-       	del_shm(shm_id);
+	shmid_childList = initChildList(numofProcesses);
+	
+	char line[20];
+	int status;
+	int i = 0;
+	k = 0;
+	while(commands[i] != '\0'){
+		line[k] = commands[i];
+		if(line[k] == '\n'){
+			pid_t childPid = fork();
+			if(childPid < 0){
+                		fprintf(stderr,"%s: ",programname);
+                		perror("Error");
+            		    	exit(1);
+        		}else if(childPid == 0 ){
+		 		childProcess(i, line);
+				break;
+			}else{
+				i++;
+				k = 0;
+				int a;
+				for(a = 0; a < 20; a++)
+					line[a] = '\0';
+			}
+		}else{
+			i++;
+			k++;
+		}
+	}
+	while(wait(&status) > 0); 
+			
+        dt_shm(shared_license);
+       	dt_shm(childList);
+	del_shm(shmid_license);
+	del_shm(shmid_childList);
+	
+	free(commands);
 
 }
 int main(int argc, char** argv){
+	int nLicense;
 	programname = argv[0];
 	signal(SIGINT, interrupt_handler);
 	signal(SIGALRM, alarm_handler);
@@ -182,8 +213,8 @@ int main(int argc, char** argv){
 			return EXIT_FAILURE;
 	}
 	
-	runProcess(nLicense); 
-	printf("Checkpoint");	
+	initProcess(nLicense); 
+	printf("\nCheckpoint\n");	
 	return EXIT_SUCCESS;
 
 
