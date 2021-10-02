@@ -3,13 +3,16 @@
 #include <string.h>
 #include <ctype.h>
 #include "config.h"
+#include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
+#include <signal.h>
 
 int sleeptime;
 char* repfactor;
 char* programname;
 char msg[70];
+char *text = NULL;
 #define msgsize 70
 
 int validNum(char* num){
@@ -54,6 +57,22 @@ void assignmsg(int currIterate){
 	return;
 
 }
+void generateLog(){
+	if((text = (char*) malloc(BUFFER_LOG)) == NULL){
+		fprintf(stderr,"%s: failed to allocate log. ",programname);
+                perror("Error:");
+                exit(1);
+        }
+	
+	int reps = atoi(repfactor);
+        int i;
+	for(i = 0; i < reps; i++){
+                sleep(sleeptime);
+                assignmsg(i);
+                strcat(text, msg);
+        }
+
+}
 void logmsg(const char * msg){
 	FILE * ptr = fopen(LOGFILE, "a");
 	if(ptr == NULL){
@@ -63,13 +82,20 @@ void logmsg(const char * msg){
 	}
 	fputs(msg, ptr);
 	fclose(ptr);
+	free(text);
 	return;
 
 }
+void handler(){
+	if(text != NULL){
+		free(text);
+	}
+	exit(1);
+}
 int main(int argc, char** argv){
-	int i;
 	programname = argv[0];
-
+	signal(SIGINT, handler);
+	signal(SIGALRM, handler);
 	if(argc != 3){
 		fprintf(stderr, "ERROR: Please pass in two positive integer number!\n");
 		return EXIT_FAILURE;
@@ -77,23 +103,16 @@ int main(int argc, char** argv){
 		if((validNum(argv[1]) == 1) && (validNum(argv[2]) == 1)){
 			sleeptime = atoi(argv[1]);
 			repfactor = argv[2];
-			printf("The sleep time: %d.\n", sleeptime);
-			printf("The repeat factor: %s.\n", repfactor);
 		}else{
 			fprintf(stderr, "ERROR: Please pass in two positive integer number!\n");
 			return EXIT_FAILURE;
 		}
 
 	}
-	int reps = atoi(repfactor);
-	for(i = 0; i < reps; i++){
-		sleep(sleeptime);
-		assignmsg(i);
-		logmsg(msg);
-	}
+	
+	generateLog();
 
-
-
+	logmsg(text);
 
 	return EXIT_SUCCESS;
 

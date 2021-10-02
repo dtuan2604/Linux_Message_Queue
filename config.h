@@ -8,5 +8,7 @@
 #define LOGFILE "logmsg.txt"
 #define MAX_TIMEOUT 5
 #define BUFFER_SIZE 300
+#define BUFFER_LOG 2000
+
 
 #endif
