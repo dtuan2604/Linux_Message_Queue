@@ -93,6 +93,24 @@ void interrupt_handler(){
 	}
 	exit(1);
 }
+int initLicense(int nLicense){
+	int shmid = shmget(key_license, SHM_SIZE, IPC_CREAT | 0666);
+
+        if(shmid< 0){
+                fprintf(stderr,"%s: failed to get id ",programname);
+                perror("Error:");
+                exit(1);
+        }
+
+        shared_license = shmat(shmid, NULL, 0);
+
+        if(shared_license == (int *) -1){
+                fprintf(stderr,"%s: failed to get pointer ",programname);
+                perror("Error:");
+                exit(1);
+        }
+	return shmid;
+}
 int initChildList(int numofProcesses){
 	int i;
 	int shmid = shmget(key_pidlist, sizeof(pid_t) * numofProcesses, IPC_CREAT | 0666);
@@ -117,23 +135,7 @@ int initChildList(int numofProcesses){
 void initProcess(int nLicense){
 
 	parentPid = getpid();
-	shmid_license = shmget(key_license, SHM_SIZE, IPC_CREAT | 0666);
-
-        if(shmid_license < 0){
-           	fprintf(stderr,"%s: failed to get id ",programname);
-                perror("Error:");
-		exit(1);
-        }
-
-        shared_license = shmat(shmid_license, NULL, 0);
-
-        if(shared_license == (int *) -1){
-                fprintf(stderr,"%s: failed to get pointer ",programname);
-                perror("Error:");
-                exit(1);
-        }
-
-        *shared_license = nLicense; //assign number of license to the shared memory
+	shmid_license = initLicense(nLicense);
 	
 	char* commands = NULL;
 	if((commands = (char*) malloc(BUFFER_SIZE)) == NULL){
