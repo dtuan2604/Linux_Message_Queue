@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <ctype.h>
 #include "config.h"
+//#include "license.h"
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
@@ -61,22 +62,54 @@ void del_shm(int shmid){
 	}	
 	return;
 }
-void childProcess(int i, char* command){
-	childList[i] = getpid();
-	printf("I am %d\n, I am taking command: %s.", getpid(), command);
-	while(1); //Testing interrupt handler
+void childProcess(int pIndex, char* command){
+	childList[pIndex] = getpid();
+	printf("I am %d, I am taking command: %s.", getpid(), command);
 	exit(0);
 }
 void killAllProcesses(){
 	int i;
 	for(i = 0; i < numofProcesses; i++){
-		printf("Terminate child %d\n", childList[i]);
-		kill(childList[i], SIGKILL); 
+		if(childList[i] != 0){
+			printf("Terminate child %d\n", childList[i]);
+			kill(childList[i], SIGKILL); 
+		}
 	}
+}
+void removePid(pid_t p){
+	int i;
+	for(i = 0; i < numofProcesses; i++){
+		if(childList[i] == p){
+			childList[i] = 0;
+			break;
+		}
+	}
+}
+void getlicense(){
+	pid_t p;
+	if(*shared_license <= 0){
+		p = wait(NULL);
+		(*shared_license)++;
+		removePid(p);	
+	}
+	(*shared_license)--;
 
 }
-
-
+void returnlicense(){
+	pid_t p;
+	if((p = waitpid(-1, NULL, WNOHANG)) != 0){
+		(*shared_license)++;
+		removePid(p);		
+	}
+}
+int findEmptychild(){
+	int i;
+	for(i = 0; i < numofProcesses; i++){
+		if(childList[i] == 0)
+			return i;
+	}
+	return -1;
+}
 void alarm_handler(int sig){
 	if(getpid() == parentPid){
 		printf("Alarm handler is triggered\n");
@@ -124,6 +157,7 @@ int initLicense(int nLicense){
                 perror("Error:");
                 exit(1);
         }
+	*shared_license = nLicense;
 	return shmid;
 }
 int initChildList(int numofProcesses){
@@ -151,7 +185,8 @@ void initProcess(int nLicense){
 
 	parentPid = getpid();
 	shmid_license = initLicense(nLicense);
-	
+	numofProcesses = nLicense;
+		
 	char* commands = NULL;
 	if((commands = (char*) malloc(BUFFER_SIZE)) == NULL){
 		fprintf(stderr,"%s: failed to get commands ",programname);
@@ -165,8 +200,6 @@ void initProcess(int nLicense){
 	inputChar = getchar();
 	while(inputChar != EOF){
 		strncat(commands, &inputChar,1);
-		if(inputChar == '.')
-			numofProcesses++;
 		inputChar = getchar();
 	}	
 	
@@ -180,6 +213,8 @@ void initProcess(int nLicense){
 	while(commands[i] != '\0'){
 		line[k] = commands[i];
 		if(line[k] == '\n'){
+			getlicense();
+			pIndex = findEmptychild();
 			pid_t childPid = fork();
 			if(childPid < 0){
                 		fprintf(stderr,"%s: ",programname);
@@ -190,11 +225,11 @@ void initProcess(int nLicense){
 				break;
 			}else{
 				i++;
-				pIndex++;
 				k = 0;
 				int a;
 				for(a = 0; a < 20; a++)
 					line[a] = '\0';
+				returnlicense();
 			}
 		}else{
 			i++;

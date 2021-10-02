@@ -3,6 +3,7 @@
 #include <string.h>
 #include <ctype.h>
 #include "config.h"
+#include "license.h"
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
@@ -55,6 +56,16 @@ void assignmsg(int currIterate){
 	strcat(msg, repfactor);
 	strcat(msg,"\n");
 	return;
+}
+void logmsg(const char * msg){
+        FILE * ptr = fopen(LOGFILE, "a");
+        if(ptr == NULL){
+                perror("Error at license function:");
+                exit(1);
+        }
+        fputs(msg, ptr);
+        fclose(ptr);
+        return;
 
 }
 void generateLog(){
@@ -73,20 +84,8 @@ void generateLog(){
         }
 
 }
-void logmsg(const char * msg){
-	FILE * ptr = fopen(LOGFILE, "a");
-	if(ptr == NULL){
-		fprintf(stderr,"%s: ",programname);
-                perror("Error:");
-                exit(1);	
-	}
-	fputs(msg, ptr);
-	fclose(ptr);
-	free(text);
-	return;
-
-}
 void handler(){
+	printf("Testsim hanlder is triggered\n");
 	if(text != NULL){
 		free(text);
 	}
@@ -113,6 +112,7 @@ int main(int argc, char** argv){
 	generateLog();
 
 	logmsg(text);
+	free(text);
 
 	return EXIT_SUCCESS;
 
