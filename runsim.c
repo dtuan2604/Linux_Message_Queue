@@ -14,10 +14,10 @@ char* programname;
 
 key_t key_license = 2604;
 key_t key_pidlist = 1708;
-pid_t *childList;
+pid_t *childList = NULL;
 pid_t parentPid;
 
-int *shared_license;
+int *shared_license = NULL;
 int shmid_license;
 int shmid_childList;
 int numofProcesses = 0; 
@@ -62,34 +62,49 @@ void del_shm(int shmid){
 	return;
 }
 void childProcess(int i, char* command){
+	childList[i] = getpid();
 	printf("I am %d\n, I am taking command: %s.", getpid(), command);
+	while(1); //Testing interrupt handler
 	exit(0);
 }
 void killAllProcesses(){
 	int i;
-	if(getpid() == parentPid){
-		for(i = 0; i < numofProcesses; i++){
+	for(i = 0; i < numofProcesses; i++){
+		printf("Terminate child %d\n", childList[i]);
 		kill(childList[i], SIGKILL); 
-		}
 	}
-}
-void alarm_handler(){
-	printf("Alarm handler is triggered\n");
-        killAllProcesses();
-        dt_shm(shared_license);
-        dt_shm(childList);
-        del_shm(shmid_license);
-        del_shm(shmid_childList);
 
 }
-void interrupt_handler(){
+
+
+void alarm_handler(int sig){
+	if(getpid() == parentPid){
+		printf("Alarm handler is triggered\n");
+		killAllProcesses();
+		if(shared_license != NULL){
+			dt_shm(shared_license);
+        		del_shm(shmid_license);
+		}
+		if(childList != NULL){
+        		dt_shm(childList);
+			del_shm(shmid_childList);
+		}
+	}
+	exit(1);
+}
+void interrupt_handler(int sig){
         if(getpid() == parentPid){
 		printf("Interrupt handler is triggered\n");
         	killAllProcesses();
-		dt_shm(shared_license);
-        	dt_shm(childList);
-        	del_shm(shmid_license);
-        	del_shm(shmid_childList);
+		printf("checking\n");
+		if(shared_license != NULL){
+	                dt_shm(shared_license);
+        	        del_shm(shmid_license);
+       		}
+	        if(childList != NULL){
+        	        dt_shm(childList);
+                	del_shm(shmid_childList);
+        	}
 	}
 	exit(1);
 }
@@ -128,7 +143,7 @@ int initChildList(int numofProcesses){
         }
 
 	for( i = 0; i< numofProcesses; i++){
-		childList[i] = 0; 
+		childList[i] = 0;
 	}
 	return shmid;
 }
@@ -160,6 +175,7 @@ void initProcess(int nLicense){
 	char line[20];
 	int status;
 	int i = 0;
+	int pIndex = 0;
 	k = 0;
 	while(commands[i] != '\0'){
 		line[k] = commands[i];
@@ -170,10 +186,11 @@ void initProcess(int nLicense){
                 		perror("Error");
             		    	exit(1);
         		}else if(childPid == 0 ){
-		 		childProcess(i, line);
+		 		childProcess(pIndex, line);
 				break;
 			}else{
 				i++;
+				pIndex++;
 				k = 0;
 				int a;
 				for(a = 0; a < 20; a++)
