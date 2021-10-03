@@ -3,3 +3,6 @@
 ./testsim 4 5
 ./testsim 5 6
 ./testsim 8 7
+./testsim 4 7
+./testsim 3 5
+./testsim 5 7

@@ -63,7 +63,6 @@ void del_shm(int shmid){
 	return;
 }
 void childProcess(int pIndex, char* command){
-	childList[pIndex] = getpid();
 	printf("I am %d, I am taking command: %s.", getpid(), command);
 	exit(0);
 }
@@ -105,8 +104,9 @@ void returnlicense(){
 int findEmptychild(){
 	int i;
 	for(i = 0; i < numofProcesses; i++){
-		if(childList[i] == 0)
+		if(childList[i] == 0){
 			return i;
+		}
 	}
 	return -1;
 }
@@ -122,8 +122,8 @@ void alarm_handler(int sig){
         		dt_shm(childList);
 			del_shm(shmid_childList);
 		}
+		exit(1);
 	}
-	exit(1);
 }
 void interrupt_handler(int sig){
         if(getpid() == parentPid){
@@ -138,8 +138,8 @@ void interrupt_handler(int sig){
         	        dt_shm(childList);
                 	del_shm(shmid_childList);
         	}
+		exit(1);
 	}
-	exit(1);
 }
 int initLicense(int nLicense){
 	int shmid = shmget(key_license, SHM_SIZE, IPC_CREAT | 0666);
@@ -186,6 +186,7 @@ void initProcess(int nLicense){
 	parentPid = getpid();
 	shmid_license = initLicense(nLicense);
 	numofProcesses = nLicense;
+	shmid_childList = initChildList(numofProcesses);
 		
 	char* commands = NULL;
 	if((commands = (char*) malloc(BUFFER_SIZE)) == NULL){
@@ -202,8 +203,6 @@ void initProcess(int nLicense){
 		strncat(commands, &inputChar,1);
 		inputChar = getchar();
 	}	
-	
-	shmid_childList = initChildList(numofProcesses);
 	
 	char line[20];
 	int status;
@@ -224,6 +223,7 @@ void initProcess(int nLicense){
 		 		childProcess(pIndex, line);
 				break;
 			}else{
+				childList[pIndex] = childPid;
 				i++;
 				k = 0;
 				int a;
