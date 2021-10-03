@@ -10,10 +10,12 @@
 #include <signal.h>
 
 int sleeptime;
+
 char* repfactor;
 char* programname;
 char msg[70];
 char *text = NULL;
+
 #define msgsize 70
 
 int validNum(char* num){

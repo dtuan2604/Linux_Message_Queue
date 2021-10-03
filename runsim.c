@@ -13,14 +13,23 @@
 
 char* programname;
 
-key_t key_license = 2604;
-key_t key_pidlist = 1708;
+key_t key_license = LICENSE;
+key_t key_childlist = CHILDLIST;
+key_t key_choosing = CHOOSING;
+key_t key_number = NUMBER;
+
 pid_t *childList = NULL;
 pid_t parentPid;
 
 int *shared_license = NULL;
+int *choosing = NULL;
+int *number = NULL;
+
 int shmid_license;
 int shmid_childList;
+int shmid_choosing;
+int shmid_number;
+
 int numofProcesses = 0; 
 
 
@@ -137,39 +146,42 @@ int findEmptychild(){
 	}
 	return -1;
 }
+void deallocateMemory(){
+	if(shared_license != NULL){
+      		dt_shm(shared_license);
+                del_shm(shmid_license);
+       	}
+        if(childList != NULL){
+        	dt_shm(childList);
+        	del_shm(shmid_childList);
+        }
+	if(choosing != NULL){
+		dt_shm(choosing);
+		del_shm(shmid_choosing);
+	}
+	if(number != NULL){
+		dt_shm(number);
+		del_shm(shmid_number);
+	}
+}
 void alarm_handler(int sig){
 	if(getpid() == parentPid){
 		printf("Alarm handler is triggered\n");
 		killAllProcesses();
-		if(shared_license != NULL){
-			dt_shm(shared_license);
-        		del_shm(shmid_license);
-		}
-		if(childList != NULL){
-        		dt_shm(childList);
-			del_shm(shmid_childList);
-		}
-		exit(1);
+		deallocateMemory();
 	}
+	exit(1);
 }
 void interrupt_handler(int sig){
         if(getpid() == parentPid){
 		printf("Interrupt handler is triggered\n");
         	killAllProcesses();
-		printf("checking\n");
-		if(shared_license != NULL){
-	                dt_shm(shared_license);
-        	        del_shm(shmid_license);
-       		}
-	        if(childList != NULL){
-        	        dt_shm(childList);
-                	del_shm(shmid_childList);
-        	}
-		exit(1);
+		deallocateMemory();
 	}
+	exit(1);
 }
 int initLicense(int nLicense){
-	int shmid = shmget(key_license, SHM_SIZE, IPC_CREAT | 0666);
+	int shmid = shmget(key_license, sizeof(int), IPC_CREAT | 0666);
 
         if(shmid< 0){
                 fprintf(stderr,"%s: failed to get id ",programname);
@@ -177,7 +189,7 @@ int initLicense(int nLicense){
                 exit(1);
         }
 
-        shared_license = shmat(shmid, NULL, 0);
+        shared_license = (int *) shmat(shmid, NULL, 0);
 
         if(shared_license == (int *) -1){
                 fprintf(stderr,"%s: failed to get pointer ",programname);
@@ -189,7 +201,7 @@ int initLicense(int nLicense){
 }
 int initChildList(int numofProcesses){
 	int i;
-	int shmid = shmget(key_pidlist, sizeof(pid_t) * numofProcesses, IPC_CREAT | 0666);
+	int shmid = shmget(key_childlist, sizeof(pid_t) * numofProcesses, IPC_CREAT | 0666);
 	if(shmid < 0){
                 fprintf(stderr,"%s: failed to get id ",programname);
                 perror("Error:");
@@ -197,7 +209,7 @@ int initChildList(int numofProcesses){
         }
 	
 	childList = (pid_t *) shmat(shmid, NULL, 0);
-	if(childList == (int *) -1){
+	if(childList == (pid_t *) -1){
                 fprintf(stderr,"%s: failed to get pointer ",programname);
                 perror("Error:");
                 exit(1);
@@ -208,13 +220,56 @@ int initChildList(int numofProcesses){
 	}
 	return shmid;
 }
+int initChoosingList(int numofProcesses){
+	int shmid = shmget(key_choosing, sizeof(int)*numofProcesses, IPC_CREAT | 0666);
+	if(shmid < 0){
+                fprintf(stderr,"%s: failed to get id ",programname);
+                perror("Error:");
+                exit(1);
+        }
+	choosing = (int *) shmat(shmid, NULL, 0);
+	if(choosing == (int *) -1){
+                fprintf(stderr,"%s: failed to get pointer ",programname);
+                perror("Error:");
+                exit(1);
+        }
+	
+	return shmid;
+}
+int initNumberList(int numofProcesses){
+	int i;
+	int shmid = shmget(key_number, sizeof(int)*numofProcesses, IPC_CREAT | 0666);
+        if(shmid < 0){
+                fprintf(stderr,"%s: failed to get id ",programname);
+                perror("Error:");
+                exit(1);
+        }
+        number = (int *) shmat(shmid, NULL, 0);
+	if(number == (int *) -1){
+                fprintf(stderr,"%s: failed to get pointer ",programname);
+                perror("Error:");
+                exit(1);
+        }
+
+	for( i = 0; i< numofProcesses; i++){
+                number[i] = 0;
+        }
+	
+
+        return shmid;
+
+
+}
 void initProcess(int nLicense){
 
 	parentPid = getpid();
-	shmid_license = initLicense(nLicense);
 	numofProcesses = nLicense;
+
+	shmid_license = initLicense(nLicense);
 	shmid_childList = initChildList(numofProcesses);
-		
+	shmid_choosing = initChoosingList(numofProcesses);
+	shmid_number = initNumberList(numofProcesses);	
+	
 	char* commands = NULL;
 	if((commands = (char*) malloc(BUFFER_SIZE)) == NULL){
 		fprintf(stderr,"%s: failed to get commands ",programname);
@@ -267,9 +322,14 @@ void initProcess(int nLicense){
 			
         dt_shm(shared_license);
        	dt_shm(childList);
+	dt_shm(choosing);
+	dt_shm(number);
+
 	del_shm(shmid_license);
 	del_shm(shmid_childList);
-	
+	del_shm(shmid_choosing);
+	del_shm(shmid_number);
+
 	free(commands);
 
 }
