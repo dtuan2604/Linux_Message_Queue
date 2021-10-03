@@ -11,11 +11,6 @@
 #include <signal.h>
 
 int sleeptime;
-int shmid_license;
-int shmid_childList;
-int shmid_choosing;
-int shmid_number; 
-
 
 pid_t *childList = NULL;
 int *shared_license = NULL;
@@ -29,89 +24,64 @@ char *text = NULL;
 
 #define msgsize 70
 
-void dt_shm(int* shm){
-        int dt_return = shmdt(shm);
-        if(dt_return == -1){
-                fprintf(stderr,"%s: failed to detach ",programname);
-                perror("Error");
-        }
-        return;
-}
-void del_shm(int shmid){
-        int ctl_return = shmctl(shmid, IPC_RMID, NULL);
-        if(ctl_return == -1){
-                fprintf(stderr,"%s: failed to delete %d, ",programname,shmid);
-                perror("Error");
-        }
-        return;
-}
-int getSharedLicense(){
-	int shmid = shmget(key_license, sizeof(int), 0666);
-	if(shmid< 0){
+int getSharedMemory(){
+	int shmid1 = shmget(key_license, sizeof(int), 0666);
+	if(shmid1 < 0){
                 fprintf(stderr,"%s: failed to get id ",programname);
                 perror("Error:");
                 exit(1);
         }
 
-        shared_license = (int *) shmat(shmid, NULL, 0);
+        shared_license = (int *) shmat(shmid1, NULL, 0);
 	if(shared_license == (int *) -1){
                 fprintf(stderr,"%s: failed to get pointer ",programname);
                 perror("Error:");
                 exit(1);
         }
 
-	return shmid;
-}
-int getChildList(){
-	int shmid = shmget(key_childlist, sizeof(pid_t) * (*shared_license), 0666);
-	if(shmid < 0){
+	int shmid2 = shmget(key_childlist, sizeof(pid_t) * (*shared_license), 0666);
+	if(shmid2 < 0){
                 fprintf(stderr,"%s: failed to get id ",programname);
                 perror("Error:");
                 exit(1);
         }
 
-	childList = (pid_t *) shmat(shmid, NULL, 0);
+	childList = (pid_t *) shmat(shmid2, NULL, 0);
         if(childList == (pid_t *) -1){
                 fprintf(stderr,"%s: failed to get pointer ",programname);
                 perror("Error:");
                 exit(1);
         }
-	return shmid;	
-}
-int getChoosingList(){
-	int shmid = shmget(key_choosing, sizeof(int) * (*shared_license), 0666);
-        if(shmid < 0){
+	
+	int shmid3 = shmget(key_choosing, sizeof(int) * (*shared_license), 0666);
+        if(shmid3 < 0){
                 fprintf(stderr,"%s: failed to get id ",programname);
                 perror("Error:");
                 exit(1);
         }
 
-        choosing = (int *) shmat(shmid, NULL, 0);
+        choosing = (int *) shmat(shmid3, NULL, 0);
         if(choosing == (int *) -1){
                 fprintf(stderr,"%s: failed to get pointer ",programname);
                 perror("Error:");
                 exit(1);
         }
-        return shmid;
-
-
-}
-int getNumberList(){
-	int shmid = shmget(key_number, sizeof(int) * (*shared_license), 0666);
-        if(shmid < 0){
+	
+	int shmid4 = shmget(key_number, sizeof(int) * (*shared_license), 0666);
+        if(shmid4 < 0){
                 fprintf(stderr,"%s: failed to get id ",programname);
                 perror("Error");
                 exit(1);
         }
 
-        number = (int *) shmat(shmid, NULL, 0);
+        number = (int *) shmat(shmid4, NULL, 0);
         if(number == (int *) -1){
                 fprintf(stderr,"%s: failed to get pointer ",programname);
                 perror("Error:");
                 exit(1);
         }
-        return shmid;
-
+	int numofProcesses = *shared_license;
+	return numofProcesses; 
 }
 int validNum(char* num){
         int size = strlen(num);
@@ -176,6 +146,26 @@ void handler(){
 	}
 	exit(1);
 }
+int getCurrentProcess(int numofProcesses){
+	int i;
+	pid_t p = getpid();
+	
+	for(i = 0; i < numofProcesses; i++){
+		if(p == childList[i])
+			return i;
+	}
+	return -1;
+}
+int maxNumber(numofProcesses){
+	int i;
+	int max = number[0];
+	
+	for(i = 1; i < numofProcesses; i++){
+		if(max > number[i])
+			max = number[i];
+	}
+	return max;
+}
 int main(int argc, char** argv){
 	programname = argv[0];
 	
@@ -189,27 +179,42 @@ int main(int argc, char** argv){
 			sleeptime = atoi(argv[1]);
 			repfactor = argv[2];
 		}else{
-			fprintf(stderr, "ERROR: Please pass in two positive integer number!\n");
+			fprintf(stderr, "%s: ERROR: Please pass in two positive integer number!\n",programname);
 			return EXIT_FAILURE;
 		}
 
 	}
 	
 	printf("I am %d, my commands is %d %s\n", getpid(), sleeptime,repfactor);
-	shmid_license = getSharedLicense();	
-	shmid_childList = getChildList();
-	shmid_choosing = getChoosingList();
-	shmid_number = getNumberList();
-	return EXIT_SUCCESS;
+	
+	int numofProcesses = getSharedMemory();
+	int i = getCurrentProcess(numofProcesses);
+	int j;
+	if(i == -1){
+		fprintf(stderr, "%s: ERROR: Cannot find the process ID\n",programname);
+		return(EXIT_FAILURE);
+	}	
+
 	generateLog();
 
-	logmsg(text);
+	do{
+ 		choosing[i] = 1; 
+ 		number[i] = 1 + maxNumber(numofProcesses);
+ 		choosing[i] = 0; 
+ 		for ( j = 0; j < numofProcesses; j++ ) { 
+ 			while ( choosing[j] ); // Wait if j happens to be choosing 
+ 			while ( (number[j] != 0) && ( number[j] < number[i] || (number[j] == number[i] && j < i) ) ); 
+ 		} 
+ 
+		logmsg(text);//critical section 
+ 
+ 		number[i] = 0; 
+ 		break;
+
+	}while ( 1 );
+
 	free(text);
 
 	return EXIT_SUCCESS;
-
-
-
-
 
 }

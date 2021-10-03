@@ -4,13 +4,9 @@
 #include <sys/types.h>
 
 #define MAX_PROCESS 20
-#define MAX_TIMEOUT 10
+#define MAX_TIMEOUT 100
 #define BUFFER_SIZE 300
 #define BUFFER_LOG 2000
-#define LICENSE 2604
-#define CHILDLIST 1708
-#define CHOOSING 4508
-#define NUMBER 2223
 
 const key_t key_license = 2604;
 const key_t key_childlist = 1708;
