@@ -4,7 +4,7 @@
 #include <unistd.h>
 #include <ctype.h>
 #include "config.h"
-//#include "license.h"
+#include "license.h"
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
@@ -13,17 +13,13 @@
 
 char* programname;
 
-key_t key_license = LICENSE;
-key_t key_childlist = CHILDLIST;
-key_t key_choosing = CHOOSING;
-key_t key_number = NUMBER;
-
 pid_t *childList = NULL;
 pid_t parentPid;
 
 int *shared_license = NULL;
 int *choosing = NULL;
 int *number = NULL;
+int nLicense;
 
 int shmid_license;
 int shmid_childList;
@@ -122,18 +118,18 @@ void removePid(pid_t p){
 }
 void getlicense(){
 	pid_t p;
-	if(*shared_license <= 0){
+	if(nLicense <= 0){
 		p = wait(NULL);
-		(*shared_license)++;
+		nLicense++;
 		removePid(p);	
 	}
-	(*shared_license)--;
+	nLicense--;
 
 }
 void returnlicense(){
 	pid_t p;
 	if((p = waitpid(-1, NULL, WNOHANG)) != 0){
-		(*shared_license)++;
+		nLicense++;
 		removePid(p);		
 	}
 }
@@ -180,7 +176,7 @@ void interrupt_handler(int sig){
 	}
 	exit(1);
 }
-int initLicense(int nLicense){
+int initLicense(){
 	int shmid = shmget(key_license, sizeof(int), IPC_CREAT | 0666);
 
         if(shmid< 0){
@@ -260,12 +256,12 @@ int initNumberList(int numofProcesses){
 
 
 }
-void initProcess(int nLicense){
+void initProcess(){
 
 	parentPid = getpid();
 	numofProcesses = nLicense;
 
-	shmid_license = initLicense(nLicense);
+	shmid_license = initLicense();
 	shmid_childList = initChildList(numofProcesses);
 	shmid_choosing = initChoosingList(numofProcesses);
 	shmid_number = initNumberList(numofProcesses);	
@@ -334,7 +330,6 @@ void initProcess(int nLicense){
 
 }
 int main(int argc, char** argv){
-	int nLicense;
 	programname = argv[0];
 	signal(SIGINT, interrupt_handler);
 	signal(SIGALRM, alarm_handler);
@@ -354,7 +349,7 @@ int main(int argc, char** argv){
 			return EXIT_FAILURE;
 	}
 	
-	initProcess(nLicense); 
+	initProcess(); 
 	printf("\nCheckpoint\n");	
 	return EXIT_SUCCESS;
 
