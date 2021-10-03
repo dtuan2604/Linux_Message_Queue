@@ -63,8 +63,35 @@ void del_shm(int shmid){
 	return;
 }
 void childProcess(int pIndex, char* command){
-	printf("I am %d, I am taking command: %s.", getpid(), command);
-	exit(0);
+	int i = 0;
+	int j = 0;
+	char filename[10] = {"\0"};
+	char sleeptime[5] = {"\0"};
+	char repfactor[5] = {"\0"};
+	//printf("%s", command);
+	//exit(0);
+	while(!isspace(command[i])){
+		filename[i] = command[i];
+		i++;
+	}
+	
+	i++;
+	while(!isspace(command[i])){
+		sleeptime[j] = command[i]; 
+		i++;
+		j++;
+	}
+
+	i++;
+	j = 0;
+	while(command[i] != '\n' ){
+		repfactor[j] = command[i];
+		i++;
+		j++;
+	}
+	execl(filename, filename, sleeptime, repfactor, NULL);	
+	
+	exit(EXIT_SUCCESS);
 }
 void killAllProcesses(){
 	int i;

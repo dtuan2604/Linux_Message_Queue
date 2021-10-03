@@ -109,6 +109,9 @@ int main(int argc, char** argv){
 
 	}
 	
+	printf("I am %d, my commands is %d %s\n", getpid(), sleeptime,repfactor);
+	return EXIT_SUCCESS; 
+	
 	generateLog();
 
 	logmsg(text);
