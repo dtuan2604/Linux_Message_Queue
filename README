@@ -1,0 +1,70 @@
+#Project 2: Concurrent Linux Processes and Shared Memory
+
+
+Name:		Duong Tuan Hoang
+Section: 	CMPSCI 4760 - Operating System
+VCS: 		git
+Date: 		10/03/2021
+
+#Files
+	runsim.c - the main program
+	testsim.c - the application program
+	license.h - header file containing license public function's prototype
+	config.h - header file containing any constant needed for this project
+	testing.data
+	makefile
+
+## How to run the program
+
+	./runsim [n] < testing.data
+
+		n: the number of license
+
+
+## Remove all executables and object files
+
+	make clean
+
+## Central Data Structure
+	
+	Shared Memory:
+		shared_license: contains the number of license
+		childList: an array contains the list of child processes running concurrently
+		choosing: an array contains the turns to pick number of child processes (bakery's algorithm)
+		number: an array contains the turns to get in the critical section (bakery's algorithm)
+
+## Description
+	
+	runsim.c:
+		Runsim will take in 'n' parameter through command line and populate 'n' license in the program. It then read the 
+		input command up to MAX_CANON character. After that, it request a license from license manager. If there is an 
+		available license, parent process will fork a child and let it exec the respective command. If there is not an
+		available license, it will wait. After all the children exist, the program deallocate shared memory and delete
+		them. 
+	
+	testsim.c:
+		Testsim will take in two parameters from command line, which are the sleep time and the repeat factor. Testsim 
+		iterates loops to generate multiple message and output it to a logfile. The format of a message is as following:
+				Time	PID	Iteration# of NumberofIterations
+
+## Features:
+	
+	runsim.c: 
+		> Verifying if the parameter passed-in is valid. (It is a positive number which is under 20)
+		> Allocate shared memory to work with testsim
+		> Handling interrupt signal and alarm signal. When those functions are triggered, the shared memories are 
+		  deallocated and deleted. The child processes are killed as well. The termination time of each child are 
+		  recorded and are written into the log file 
+		> Parent process is properly implemented to ensure that there are only 'n' processes running at a time
+		> fork/exec/wait are properly handled to prevent any conflicts
+		> Printing termination time log into the log file after ending all child processes
+	
+	testsim.c:	 
+		> Properly get the shared memory from runsim
+		> Implement bakery's algorithm to ensure mutual exclusion
+		> Deallocate register's memory properly when catching interrupt signal
+		> Output the message in required form
+
+## Obstacle
+	> if runsim is called without any directed input at first, the program is idled, and only stop when user sends a 
+	  interrupt signal, or the alarm signal is triggered 

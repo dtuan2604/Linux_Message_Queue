@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <limits.h>
 #include <ctype.h>
 #include "config.h"
 #include "license.h"
@@ -196,7 +197,7 @@ void deallocateMemory(){
 	if(terminateLog != NULL)
 		free(terminateLog);
 }
-void alarm_handler(int sig){
+void alarm_handler(){
 	if(getpid() == parentPid){
 		printf("Alarm handler is triggered\n");
 		killAllProcesses();
@@ -204,7 +205,7 @@ void alarm_handler(int sig){
 	}
 	exit(1);
 }
-void interrupt_handler(int sig){
+void interrupt_handler(){
         if(getpid() == parentPid){
 		printf("Interrupt handler is triggered\n");
         	killAllProcesses();
@@ -324,7 +325,6 @@ void initProcess(){
 	}	
 	initTerminationLog(numofLine);
 	char line[20];
-	//int status;
 	int i = 0;
 	int pIndex = 0;
 	k = 0;
@@ -350,6 +350,9 @@ void initProcess(){
 					line[a] = '\0';
 				returnlicense();
 			}
+		}else if(k >= MAX_CANON){
+			fprintf(stderr,"%s: Error: The number of character has exceeded %d\n",programname, MAX_CANON);
+			interrupt_handler();			
 		}else{
 			i++;
 			k++;
@@ -357,7 +360,6 @@ void initProcess(){
 	}
 	
 	pid_t p;
-	//while(wait(&status) > 0); 
 	while((p =  wait(NULL)) > 0){
 		printf("%d dies\n",p);
 		addTerminateLog(p);
