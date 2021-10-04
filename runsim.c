@@ -5,6 +5,7 @@
 #include <ctype.h>
 #include "config.h"
 #include "license.h"
+#include <time.h>
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/shm.h>
@@ -12,6 +13,7 @@
 #include <signal.h>
 
 char* programname;
+char* terminateLog = NULL;
 
 pid_t *childList = NULL;
 pid_t parentPid;
@@ -19,7 +21,6 @@ pid_t parentPid;
 int *shared_license = NULL;
 int *choosing = NULL;
 int *number = NULL;
-int nLicense;
 
 int shmid_license;
 int shmid_childList;
@@ -27,6 +28,8 @@ int shmid_choosing;
 int shmid_number;
 
 int numofProcesses = 0; 
+int nLicense;
+
 
 
 int validNum(char* num){
@@ -34,7 +37,7 @@ int validNum(char* num){
         int i = 0;
         while(i < size){
                 if(!isdigit(num[i])){
-                        fprintf(stderr, "ERROR: Please enter a positive integer.\n");
+                        fprintf(stderr, "%s: ERROR: Please enter a positive integer.\n", programname);
 			return 0;
 		}
                 i++;
@@ -44,13 +47,40 @@ int validNum(char* num){
 int inRange(char* num){
 	int number = atoi(num);
 	if(number > MAX_PROCESS){
-		fprintf(stderr, "ERROR: Please enter the number of license as a number smaller than %d.\n", MAX_PROCESS);
+		fprintf(stderr, "%s: ERROR: Please enter the number of license as a number smaller than %d.\n",programname,MAX_PROCESS);
 		return 0;
 	}
 	return 1;
 
 }
+void addTerminateLog(pid_t p){
+	int i;
+	printf("I am %d, I am calling terminateLog\n", getpid());	
+	char msg[msgsize];
+	for(i = 0; i < msgsize; i++){
+		msg[i] = '\0';
+	}	
 
+	time_t t = time(NULL);
+        struct tm * local;
+        local = localtime(&t);
+        char ctime[30];
+        strcpy(ctime,asctime(local));
+        ctime[strlen(ctime)-1] = '\0';
+	
+	char pid[10];
+	sprintf(pid,"%d",p);
+
+	strcat(msg, ctime);
+	strcat(msg, "\t");
+	strcat(msg, "Process ID: ");
+	strcat(msg, pid);
+	strcat(msg, "\tStatus: Terminated\n");
+	strcat(terminateLog, msg);
+	fflush(stdout);
+	printf("%s\n", terminateLog); 
+	return;
+}
 void dt_shm(int* shm){
 	int dt_return = shmdt(shm);
 	if(dt_return == -1){
@@ -73,8 +103,6 @@ void childProcess(int pIndex, char* command){
 	char filename[10] = {"\0"};
 	char sleeptime[5] = {"\0"};
 	char repfactor[5] = {"\0"};
-	//printf("%s", command);
-	//exit(0);
 	while(!isspace(command[i])){
 		filename[i] = command[i];
 		i++;
@@ -103,9 +131,11 @@ void killAllProcesses(){
 	for(i = 0; i < numofProcesses; i++){
 		if(childList[i] != 0){
 			printf("Terminate child %d\n", childList[i]);
-			kill(childList[i], SIGKILL); 
+			kill(childList[i], SIGKILL);
+			addTerminateLog(childList[i]); 
 		}
 	}
+	logmsg(terminateLog);
 }
 void removePid(pid_t p){
 	int i;
@@ -120,6 +150,8 @@ void getlicense(){
 	pid_t p;
 	if(nLicense <= 0){
 		p = wait(NULL);
+		printf("%d dies\n", p);
+		addTerminateLog(p);
 		nLicense++;
 		removePid(p);	
 	}
@@ -130,6 +162,8 @@ void returnlicense(){
 	pid_t p;
 	if((p = waitpid(-1, NULL, WNOHANG)) != 0){
 		nLicense++;
+		printf("%d dies\n", p);
+		addTerminateLog(p);
 		removePid(p);		
 	}
 }
@@ -159,6 +193,8 @@ void deallocateMemory(){
 		dt_shm(number);
 		del_shm(shmid_number);
 	}
+	if(terminateLog != NULL)
+		free(terminateLog);
 }
 void alarm_handler(int sig){
 	if(getpid() == parentPid){
@@ -176,12 +212,19 @@ void interrupt_handler(int sig){
 	}
 	exit(1);
 }
+void initTerminationLog(int numofLine){
+	if((terminateLog = (char*)malloc(msgsize * numofLine)) == NULL){
+		fprintf(stderr,"%s: failed to allocate log. ",programname);
+                perror("Error:");
+                exit(1);		
+	}	
+}
 int initLicense(){
 	int shmid = shmget(key_license, sizeof(int), IPC_CREAT | 0666);
 
         if(shmid< 0){
-                fprintf(stderr,"%s: failed to get id ",programname);
-                perror("Error:");
+                fprintf(stderr,"%s: failed to get id. ",programname);
+                perror("Error");
                 exit(1);
         }
 
@@ -266,24 +309,22 @@ void initProcess(){
 	shmid_choosing = initChoosingList(numofProcesses);
 	shmid_number = initNumberList(numofProcesses);	
 	
-	char* commands = NULL;
-	if((commands = (char*) malloc(BUFFER_SIZE)) == NULL){
-		fprintf(stderr,"%s: failed to get commands ",programname);
-                perror("Error:");
-                exit(1);
-	} 	
+	char commands[BUFFER_SIZE];
 	int k;
+	int numofLine = 0;
 	for(k = 0; k <BUFFER_SIZE; k++)
 		commands[k] = '\0';	
 	char inputChar;
 	inputChar = getchar();
 	while(inputChar != EOF){
+		if(inputChar == '.')
+			numofLine++;
 		strncat(commands, &inputChar,1);
 		inputChar = getchar();
 	}	
-	
+	initTerminationLog(numofLine);
 	char line[20];
-	int status;
+	//int status;
 	int i = 0;
 	int pIndex = 0;
 	k = 0;
@@ -314,8 +355,16 @@ void initProcess(){
 			k++;
 		}
 	}
-	while(wait(&status) > 0); 
-			
+	
+	pid_t p;
+	//while(wait(&status) > 0); 
+	while((p =  wait(NULL)) > 0){
+		printf("%d dies\n",p);
+		addTerminateLog(p);
+	}	
+	
+	logmsg(terminateLog);
+		
         dt_shm(shared_license);
        	dt_shm(childList);
 	dt_shm(choosing);
@@ -326,7 +375,7 @@ void initProcess(){
 	del_shm(shmid_choosing);
 	del_shm(shmid_number);
 
-	free(commands);
+	free(terminateLog);
 
 }
 int main(int argc, char** argv){

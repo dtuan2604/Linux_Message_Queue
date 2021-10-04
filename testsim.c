@@ -19,10 +19,9 @@ int *number = NULL;
 
 char* repfactor;
 char* programname;
-char msg[70];
+char msg[msgsize];
 char *text = NULL;
 
-#define msgsize 70
 
 int getSharedMemory(){
 	int shmid1 = shmget(key_license, sizeof(int), 0666);
@@ -125,13 +124,13 @@ void assignmsg(int currIterate){
 	return;
 }
 void generateLog(){
-	if((text = (char*) malloc(BUFFER_LOG)) == NULL){
+	int reps = atoi(repfactor);
+	if((text = (char*) malloc(msgsize * reps)) == NULL){
 		fprintf(stderr,"%s: failed to allocate log. ",programname);
                 perror("Error:");
                 exit(1);
         }
 	
-	int reps = atoi(repfactor);
         int i;
 	for(i = 0; i < reps; i++){
                 sleep(sleeptime);
@@ -172,7 +171,8 @@ int main(int argc, char** argv){
 	signal(SIGINT, handler);
 	
 	if(argc != 3){
-		fprintf(stderr, "ERROR: Please pass in two positive integer number!\n");
+		fprintf(stderr, "%s: ERROR: Please pass in two positive integer number!\n", programname);
+
 		return EXIT_FAILURE;
 	}else{
 		if((validNum(argv[1]) == 1) && (validNum(argv[2]) == 1)){

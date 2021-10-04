@@ -5,8 +5,8 @@
 
 #define MAX_PROCESS 20
 #define MAX_TIMEOUT 100
-#define BUFFER_SIZE 300
-#define BUFFER_LOG 2000
+#define BUFFER_SIZE 400
+#define msgsize 80
 
 const key_t key_license = 2604;
 const key_t key_childlist = 1708;
