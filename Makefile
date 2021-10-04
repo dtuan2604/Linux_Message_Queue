@@ -1,17 +1,18 @@
-CLASSES= license.o 
+CLASSES = config.o 
+OBJ = testsim.o runsim.o
 CC = gcc
 CXXFLAGS = -g -Wall -pthread
-DEPS = license.c
+DEPS = config.c runsim.c testsim.c
 all: runsim testsim
 
 %.o: %.c $(DEPS)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-runsim : $(CLASSES)
-	$(CC) -o $@ $^ $(CXXFLAGS) $@.c -lm
+runsim : $(CLASSES) $(OBJ)
+	$(CC) $(CXXFLAGS) -lm -o $@ $(CLASSES) $@.o
 
-testsim : $(CLASSES)
-	$(CC) -o $@ $^ $(CXXFLAGS) $@.c -lm
+testsim : $(CLASSES) $(OBJ)
+	$(CC) $(CXXFLAGS) -lm -o $@ $(CLASSES) $@.o
 
 clean: 
 	rm runsim testsim *.o

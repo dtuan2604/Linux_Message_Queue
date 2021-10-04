@@ -3,7 +3,6 @@
 #include <string.h>
 #include <ctype.h>
 #include "config.h"
-#include "license.h"
 #include <sys/types.h>
 #include <sys/shm.h>
 #include <time.h>
@@ -33,50 +32,50 @@ int getSharedMemory(){
 
         shared_license = (int *) shmat(shmid1, NULL, 0);
 	if(shared_license == (int *) -1){
-                fprintf(stderr,"%s: failed to get pointer ",programname);
-                perror("Error:");
+                fprintf(stderr,"%s: failed to get pointer. ",programname);
+                perror("Error");
                 exit(1);
         }
 
 	int shmid2 = shmget(key_childlist, sizeof(pid_t) * (*shared_license), 0666);
 	if(shmid2 < 0){
-                fprintf(stderr,"%s: failed to get id ",programname);
-                perror("Error:");
+                fprintf(stderr,"%s: failed to get id. ",programname);
+                perror("Error");
                 exit(1);
         }
 
 	childList = (pid_t *) shmat(shmid2, NULL, 0);
         if(childList == (pid_t *) -1){
-                fprintf(stderr,"%s: failed to get pointer ",programname);
-                perror("Error:");
+                fprintf(stderr,"%s: failed to get pointer. ",programname);
+                perror("Error");
                 exit(1);
         }
 	
 	int shmid3 = shmget(key_choosing, sizeof(int) * (*shared_license), 0666);
         if(shmid3 < 0){
-                fprintf(stderr,"%s: failed to get id ",programname);
-                perror("Error:");
+                fprintf(stderr,"%s: failed to get id. ",programname);
+                perror("Error");
                 exit(1);
         }
 
         choosing = (int *) shmat(shmid3, NULL, 0);
         if(choosing == (int *) -1){
-                fprintf(stderr,"%s: failed to get pointer ",programname);
-                perror("Error:");
+                fprintf(stderr,"%s: failed to get pointer. ",programname);
+                perror("Error");
                 exit(1);
         }
 	
 	int shmid4 = shmget(key_number, sizeof(int) * (*shared_license), 0666);
         if(shmid4 < 0){
-                fprintf(stderr,"%s: failed to get id ",programname);
+                fprintf(stderr,"%s: failed to get id. ",programname);
                 perror("Error");
                 exit(1);
         }
 
         number = (int *) shmat(shmid4, NULL, 0);
         if(number == (int *) -1){
-                fprintf(stderr,"%s: failed to get pointer ",programname);
-                perror("Error:");
+                fprintf(stderr,"%s: failed to get pointer. ",programname);
+                perror("Error");
                 exit(1);
         }
 	int numofProcesses = *shared_license;
@@ -121,6 +120,7 @@ void assignmsg(int currIterate){
 	strcat(msg, " of ");
 	strcat(msg, repfactor);
 	strcat(msg,"\n");
+	
 	return;
 }
 void generateLog(){
@@ -184,8 +184,6 @@ int main(int argc, char** argv){
 		}
 
 	}
-	
-	printf("I am %d, my commands is %d %s\n", getpid(), sleeptime,repfactor);
 	
 	int numofProcesses = getSharedMemory();
 	int i = getCurrentProcess(numofProcesses);

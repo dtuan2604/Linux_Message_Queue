@@ -5,7 +5,6 @@
 #include <limits.h>
 #include <ctype.h>
 #include "config.h"
-#include "license.h"
 #include <time.h>
 #include <sys/types.h>
 #include <sys/ipc.h>
@@ -56,7 +55,6 @@ int inRange(char* num){
 }
 void addTerminateLog(pid_t p){
 	int i;
-	printf("I am %d, I am calling terminateLog\n", getpid());	
 	char msg[msgsize];
 	for(i = 0; i < msgsize; i++){
 		msg[i] = '\0';
@@ -78,14 +76,13 @@ void addTerminateLog(pid_t p){
 	strcat(msg, pid);
 	strcat(msg, "\tStatus: Terminated\n");
 	strcat(terminateLog, msg);
-	fflush(stdout);
-	printf("%s\n", terminateLog); 
+	
 	return;
 }
 void dt_shm(int* shm){
 	int dt_return = shmdt(shm);
 	if(dt_return == -1){
-		fprintf(stderr,"%s: failed to detach ",programname);
+		fprintf(stderr,"%s: failed to detach. ",programname);
 		perror("Error");
 	}
 	return;
@@ -93,7 +90,7 @@ void dt_shm(int* shm){
 void del_shm(int shmid){
 	int ctl_return = shmctl(shmid, IPC_RMID, NULL);
 	if(ctl_return == -1){
-		fprintf(stderr,"%s: failed to delete %d, ",programname,shmid);
+		fprintf(stderr,"%s: failed to delete %d. ",programname,shmid);
                 perror("Error");
 	}	
 	return;
@@ -131,7 +128,6 @@ void killAllProcesses(){
 	int i;
 	for(i = 0; i < numofProcesses; i++){
 		if(childList[i] != 0){
-			printf("Terminate child %d\n", childList[i]);
 			kill(childList[i], SIGKILL);
 			addTerminateLog(childList[i]); 
 		}
@@ -151,7 +147,6 @@ void getlicense(){
 	pid_t p;
 	if(nLicense <= 0){
 		p = wait(NULL);
-		printf("%d dies\n", p);
 		addTerminateLog(p);
 		nLicense++;
 		removePid(p);	
@@ -163,7 +158,6 @@ void returnlicense(){
 	pid_t p;
 	if((p = waitpid(-1, NULL, WNOHANG)) != 0){
 		nLicense++;
-		printf("%d dies\n", p);
 		addTerminateLog(p);
 		removePid(p);		
 	}
@@ -199,18 +193,20 @@ void deallocateMemory(){
 }
 void alarm_handler(){
 	if(getpid() == parentPid){
-		printf("Alarm handler is triggered\n");
+		printf("The program has exceeded the maximum timeout. It is ending now.\n");
 		killAllProcesses();
 		deallocateMemory();
 	}
+	sleep(1);
 	exit(1);
 }
 void interrupt_handler(){
         if(getpid() == parentPid){
-		printf("Interrupt handler is triggered\n");
+		printf("The program is being closed.\n");
         	killAllProcesses();
 		deallocateMemory();
 	}
+	sleep(1);
 	exit(1);
 }
 void initTerminationLog(int numofLine){
@@ -230,8 +226,7 @@ int initLicense(){
         }
 
         shared_license = (int *) shmat(shmid, NULL, 0);
-
-        if(shared_license == (int *) -1){
+	if(shared_license == (int *) -1){
                 fprintf(stderr,"%s: failed to get pointer ",programname);
                 perror("Error:");
                 exit(1);
@@ -267,6 +262,7 @@ int initChoosingList(int numofProcesses){
                 perror("Error:");
                 exit(1);
         }
+	
 	choosing = (int *) shmat(shmid, NULL, 0);
 	if(choosing == (int *) -1){
                 fprintf(stderr,"%s: failed to get pointer ",programname);
@@ -284,7 +280,8 @@ int initNumberList(int numofProcesses){
                 perror("Error:");
                 exit(1);
         }
-        number = (int *) shmat(shmid, NULL, 0);
+        
+	number = (int *) shmat(shmid, NULL, 0);
 	if(number == (int *) -1){
                 fprintf(stderr,"%s: failed to get pointer ",programname);
                 perror("Error:");
@@ -295,12 +292,9 @@ int initNumberList(int numofProcesses){
                 number[i] = 0;
         }
 	
-
         return shmid;
-
-
 }
-void initProcess(){
+void runProcess(){
 
 	parentPid = getpid();
 	numofProcesses = nLicense;
@@ -323,7 +317,9 @@ void initProcess(){
 		strncat(commands, &inputChar,1);
 		inputChar = getchar();
 	}	
+	
 	initTerminationLog(numofLine);
+	
 	char line[20];
 	int i = 0;
 	int pIndex = 0;
@@ -361,7 +357,6 @@ void initProcess(){
 	
 	pid_t p;
 	while((p =  wait(NULL)) > 0){
-		printf("%d dies\n",p);
 		addTerminateLog(p);
 	}	
 	
@@ -382,9 +377,11 @@ void initProcess(){
 }
 int main(int argc, char** argv){
 	programname = argv[0];
+	
 	signal(SIGINT, interrupt_handler);
 	signal(SIGALRM, alarm_handler);
 	alarm(MAX_TIMEOUT);
+	
 	if((argc != 2) ){
 		fprintf(stderr, "ERROR: Please input only one positive integer number as an argument.\n");
 		return EXIT_FAILURE;	
@@ -400,8 +397,7 @@ int main(int argc, char** argv){
 			return EXIT_FAILURE;
 	}
 	
-	initProcess(); 
-	printf("\nCheckpoint\n");	
+	runProcess(); 
 	return EXIT_SUCCESS;
 
 
