@@ -9,7 +9,6 @@ Date: 		10/03/2021
 #Files
 	runsim.c - the main program
 	testsim.c - the application program
-	license.h - header file containing license public function's prototype
 	config.h - header file containing any constant needed for this project
 	testing.data
 	makefile
