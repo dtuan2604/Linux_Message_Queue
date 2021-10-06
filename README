@@ -17,8 +17,9 @@ Date: 		10/03/2021
 
 	./runsim [n] < testing.data
 
-		n: the number of license
-
+		    ./runsim:	the main executable file
+			   n: 	the number of license
+		testing.data: 	the testing data file
 
 ## Remove all executables and object files
 

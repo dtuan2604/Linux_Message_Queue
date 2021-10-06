@@ -132,7 +132,8 @@ void killAllProcesses(){
 			addTerminateLog(childList[i]); 
 		}
 	}
-	logmsg(terminateLog);
+	if(terminateLog != NULL)
+		logmsg(terminateLog);
 }
 void removePid(pid_t p){
 	int i;
@@ -397,7 +398,9 @@ int main(int argc, char** argv){
 			return EXIT_FAILURE;
 	}
 	
-	runProcess(); 
+	runProcess();
+	printf("The program run successfully. It is now ending.\n");
+	sleep(1); 
 	return EXIT_SUCCESS;
 
 
