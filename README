@@ -14,7 +14,7 @@ Date: 		10/03/2021
 	makefile
 
 ## How to run the program
-
+	make
 	./runsim [n] < testing.data
 
 		    ./runsim:	the main executable file
@@ -26,7 +26,8 @@ Date: 		10/03/2021
 	make clean
 
 ## Central Data Structure
-	
+	Message Queue: contains 'n (license)' number of messages 
+
 	Shared Memory:
 		shared_license: contains the number of license
 		childList: an array contains the list of child processes running concurrently
@@ -37,24 +38,32 @@ Date: 		10/03/2021
 	
 	runsim.c:
 		Runsim will take in 'n' parameter through command line and populate 'n' license in the program. It then read the 
-		input command up to MAX_CANON character. After that, it request a license from license manager. If there is an 
-		available license, parent process will fork a child and let it exec the respective command. If there is not an
-		available license, it will wait. After all the children exist, the program deallocate shared memory and delete
-		them. 
+		input command up to MAX_CANON character. After that, it request a license from license manager by checking the mailbox. 
+			
+			If there is an available mail, parent process will fork a child. Then, child forks a grandchild to exec the 
+			'testsim' with respective command passed in. The child will wait until grandchild finishes and then exit.
+			
+			If there is not an available license, parent will wait. In each iteration, parent checks if there is any child 
+			want to return a license. If not, parent keeps looping until the end of file.
+		
+		Eventually, parent will wait until every child processes exist, then it frees all allocated memory, detaches, and deletes
+		shared memory and message queue. 		
 	
 	testsim.c:
-		Testsim will take in two parameters from command line, which are the sleep time and the repeat factor. Testsim 
-		iterates loops to generate multiple message and output it to a logfile. The format of a message is as following:
+		Testsim will take in three parameters from command line, which are the sleep time, the repeat factor, and the index of the 
+		current process executing the testsim, which is passed in from runsim. Testsim iterates loops to generate multiple message 
+		and output it to a logfile. The format of a message is as following:
 				Time	PID	Iteration# of NumberofIterations
 
 ## Features:
 	
 	runsim.c: 
 		> Verifying if the parameter passed-in is valid. (It is a positive number which is under 20)
+		> Initialize message queue with the number of license passed in
 		> Allocate shared memory to work with testsim
-		> Handling interrupt signal and alarm signal. When those functions are triggered, the shared memories are 
-		  deallocated and deleted. The child processes are killed as well. The termination time of each child are 
-		  recorded and are written into the log file 
+		> Handling interrupt signal and alarm signal. When those functions are triggered, the shared memories, and 
+		  message queue are deallocated and deleted. The child processes are killed as well. The termination time of 
+		  each child are recorded and are written into the log file 
 		> Parent process is properly implemented to ensure that there are only 'n' processes running at a time
 		> fork/exec/wait are properly handled to prevent any conflicts
 		> Printing termination time log into the log file after ending all child processes
@@ -65,6 +74,3 @@ Date: 		10/03/2021
 		> Deallocate register's memory properly when catching interrupt signal
 		> Output the message in required form
 
-## Obstacle
-	> if runsim is called without any directed input at first, the program is idled, and only stop when user sends a 
-	  interrupt signal, or the alarm signal is triggered 
