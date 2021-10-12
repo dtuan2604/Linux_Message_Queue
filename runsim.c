@@ -12,6 +12,11 @@
 #include <sys/wait.h>
 #include <signal.h>
 
+struct message{
+	long mtype;
+	char mtext[10];
+} msg;
+
 char* programname;
 char* terminateLog = NULL;
 
@@ -22,11 +27,13 @@ int *shared_license = NULL;
 int *choosing = NULL;
 int *number = NULL;
 
+int msgid = -1;
 int shmid_license;
 int shmid_childList;
 int shmid_choosing;
 int shmid_number;
 
+int numofLine = 0;
 int numofProcesses = 0; 
 int nLicense;
 
@@ -56,6 +63,13 @@ int inRange(char* num){
 void addTerminateLog(pid_t p){
 	int i;
 	char msg[msgsize];
+	char* temp = realloc(terminateLog, msgsize * numofLine); 
+	if(temp == NULL){
+		fprintf(stderr,"%s: failed to allocate log. ",programname);
+                perror("Error:");
+                exit(1);		
+	}else
+		terminateLog = temp;	
 	for(i = 0; i < msgsize; i++){
 		msg[i] = '\0';
 	}	
@@ -95,35 +109,6 @@ void del_shm(int shmid){
 	}	
 	return;
 }
-void childProcess(int pIndex, char* command){
-	int i = 0;
-	int j = 0;
-	char filename[10] = {"\0"};
-	char sleeptime[5] = {"\0"};
-	char repfactor[5] = {"\0"};
-	while(!isspace(command[i])){
-		filename[i] = command[i];
-		i++;
-	}
-	
-	i++;
-	while(!isspace(command[i])){
-		sleeptime[j] = command[i]; 
-		i++;
-		j++;
-	}
-
-	i++;
-	j = 0;
-	while(command[i] != '\n' ){
-		repfactor[j] = command[i];
-		i++;
-		j++;
-	}
-	execl(filename, filename, sleeptime, repfactor, NULL);	
-	
-	exit(EXIT_SUCCESS);
-}
 void killAllProcesses(){
 	int i;
 	for(i = 0; i < numofProcesses; i++){
@@ -152,16 +137,23 @@ void getlicense(){
 		nLicense++;
 		removePid(p);	
 	}
+	int rc = msgrcv(msgid, &msg, sizeof(msg), REQ, 0);
+        if(rc == -1){
+                fprintf(stderr,"%s: failed to send message. ",programname);
+                perror("msgget");
+                exit(1);
+        }
+        fflush(stdout);
 	nLicense--;
 
 }
 void returnlicense(){
-	pid_t p;
-	if((p = waitpid(-1, NULL, WNOHANG)) != 0){
-		nLicense++;
-		addTerminateLog(p);
-		removePid(p);		
-	}
+	int rc;
+        if((rc = msgsnd(msgid, &msg, sizeof(msg), 0)) == -1){
+               fprintf(stderr,"%s: failed to send message. ",programname);
+               perror("msgget");
+               exit(1);
+        }
 }
 int findEmptychild(){
 	int i;
@@ -171,6 +163,15 @@ int findEmptychild(){
 		}
 	}
 	return -1;
+}
+void del_queue(int queueID){
+	int ctl_return = msgctl(queueID, IPC_RMID, NULL);
+	if(ctl_return == -1){
+                fprintf(stderr,"%s: failed to delete queue %d. ",programname,queueID);
+                perror("Error");
+        }
+        return;	
+
 }
 void deallocateMemory(){
 	if(shared_license != NULL){
@@ -188,6 +189,9 @@ void deallocateMemory(){
 	if(number != NULL){
 		dt_shm(number);
 		del_shm(shmid_number);
+	}
+	if(msgid != -1){
+		del_queue(msgid);		
 	}
 	if(terminateLog != NULL)
 		free(terminateLog);
@@ -210,14 +214,33 @@ void interrupt_handler(){
 	sleep(1);
 	exit(1);
 }
-void initTerminationLog(int numofLine){
-	if((terminateLog = (char*)malloc(msgsize * numofLine)) == NULL){
+void initTerminationLog(){
+	if((terminateLog = (char*)malloc(2)) == NULL){
 		fprintf(stderr,"%s: failed to allocate log. ",programname);
                 perror("Error:");
                 exit(1);		
 	}	
 }
 int initLicense(){
+	int i, rc;
+        msg.mtype = REQ;
+        strcpy(msg.mtext,"req");
+
+        msgid = msgget(key_license, 0666 | IPC_CREAT);
+        if (msgid == -1) {
+                fprintf(stderr,"%s: failed to get queue id. ",programname);
+                perror("msgget");
+                exit(1);
+        }
+
+        for(i = 0; i<nLicense; i++){
+                if((rc = msgsnd(msgid, &msg, sizeof(msg), 0)) == -1){
+                        fprintf(stderr,"%s: failed to send message. ",programname);
+                        perror("msgget");
+                        exit(1);
+
+                }
+        }
 	int shmid = shmget(key_license, sizeof(int), IPC_CREAT | 0666);
 
         if(shmid< 0){
@@ -295,6 +318,47 @@ int initNumberList(int numofProcesses){
 	
         return shmid;
 }
+void childProcess(int index, char* command){
+        int i = 0;
+        int j = 0;
+        char filename[10] = {"\0"};
+        char sleeptime[5] = {"\0"};
+        char repfactor[5] = {"\0"};
+	char pIndex[3] = {"\0"};
+	snprintf(pIndex, 10, "%d", index);
+        while(!isspace(command[i])){
+                filename[i] = command[i];
+                i++;
+        }
+
+        i++;
+        while(!isspace(command[i])){
+                sleeptime[j] = command[i];
+                i++;
+                j++;
+        }
+
+        i++;
+        j = 0;
+        while(command[i] != '\n' ){
+                repfactor[j] = command[i];
+                i++;
+                j++;
+        }
+        
+	pid_t grandChild = fork();
+	if(grandChild < 0){
+        	fprintf(stderr,"%s: ",programname);
+                perror("Error");
+                exit(1);
+	}else if(grandChild == 0){
+		execl(filename, filename, sleeptime, repfactor, pIndex, NULL);
+        }else{
+		waitpid(grandChild,NULL,WUNTRACED);
+		returnlicense();
+	}
+        exit(EXIT_SUCCESS);
+}
 void runProcess(){
 
 	parentPid = getpid();
@@ -304,77 +368,41 @@ void runProcess(){
 	shmid_childList = initChildList(numofProcesses);
 	shmid_choosing = initChoosingList(numofProcesses);
 	shmid_number = initNumberList(numofProcesses);	
+	initTerminationLog();	
 	
-	char commands[BUFFER_SIZE];
-	int k;
-	int numofLine = 0;
-	for(k = 0; k <BUFFER_SIZE; k++)
-		commands[k] = '\0';	
-	char inputChar;
-	inputChar = getchar();
-	while(inputChar != EOF){
-		if(inputChar == '.')
-			numofLine++;
-		strncat(commands, &inputChar,1);
-		inputChar = getchar();
-	}	
-	
-	initTerminationLog(numofLine);
-	
-	char line[20];
-	int i = 0;
-	int pIndex = 0;
-	k = 0;
-	while(commands[i] != '\0'){
-		line[k] = commands[i];
-		if(line[k] == '\n'){
-			getlicense();
-			pIndex = findEmptychild();
-			pid_t childPid = fork();
-			if(childPid < 0){
-                		fprintf(stderr,"%s: ",programname);
-                		perror("Error");
-            		    	exit(1);
-        		}else if(childPid == 0 ){
-		 		childProcess(pIndex, line);
-				break;
-			}else{
-				childList[pIndex] = childPid;
-				i++;
-				k = 0;
-				int a;
-				for(a = 0; a < 20; a++)
-					line[a] = '\0';
-				returnlicense();
-			}
-		}else if(k >= MAX_CANON){
-			fprintf(stderr,"%s: Error: The number of character has exceeded %d\n",programname, MAX_CANON);
-			interrupt_handler();			
+	char line[MAX_CANON];
+	int pIndex;
+	pid_t p;	
+
+	while(fgets(line, MAX_CANON, stdin) != NULL){
+		numofLine++;
+		getlicense();
+		pIndex = findEmptychild();
+		pid_t childPid = fork();
+		if(childPid < 0){
+               		fprintf(stderr,"%s: ",programname);
+               		perror("Error");
+           	    	exit(1);
+        	}else if(childPid == 0 ){
+	 		childProcess(pIndex, line);
 		}else{
-			i++;
-			k++;
+			childList[pIndex] = childPid;
+			if((p = waitpid(-1, NULL, WNOHANG)) != 0){
+				nLicense++;
+				addTerminateLog(p);
+				removePid(p);		
+			}	
 		}
+
 	}
-	
-	pid_t p;
+
 	while((p =  wait(NULL)) > 0){
 		addTerminateLog(p);
 	}	
 	
 	logmsg(terminateLog);
 		
-        dt_shm(shared_license);
-       	dt_shm(childList);
-	dt_shm(choosing);
-	dt_shm(number);
-
-	del_shm(shmid_license);
-	del_shm(shmid_childList);
-	del_shm(shmid_choosing);
-	del_shm(shmid_number);
-
-	free(terminateLog);
-
+	deallocateMemory();
 }
 int main(int argc, char** argv){
 	programname = argv[0];

@@ -145,16 +145,6 @@ void handler(){
 	}
 	exit(1);
 }
-int getCurrentProcess(int numofProcesses){
-	int i;
-	pid_t p = getpid();
-	
-	for(i = 0; i < numofProcesses; i++){
-		if(p == childList[i])
-			return i;
-	}
-	return -1;
-}
 int maxNumber(numofProcesses){
 	int i;
 	int max = number[0];
@@ -167,10 +157,10 @@ int maxNumber(numofProcesses){
 }
 int main(int argc, char** argv){
 	programname = argv[0];
-	
+	int i;
 	signal(SIGINT, handler);
 	
-	if(argc != 3){
+	if(argc < 3){
 		fprintf(stderr, "%s: ERROR: Please pass in two positive integer number!\n", programname);
 
 		return EXIT_FAILURE;
@@ -178,6 +168,7 @@ int main(int argc, char** argv){
 		if((validNum(argv[1]) == 1) && (validNum(argv[2]) == 1)){
 			sleeptime = atoi(argv[1]);
 			repfactor = argv[2];
+			i = atoi(argv[3]);
 		}else{
 			fprintf(stderr, "%s: ERROR: Please pass in two positive integer number!\n",programname);
 			return EXIT_FAILURE;
@@ -186,7 +177,6 @@ int main(int argc, char** argv){
 	}
 	
 	int numofProcesses = getSharedMemory();
-	int i = getCurrentProcess(numofProcesses);
 	int j;
 	if(i == -1){
 		fprintf(stderr, "%s: ERROR: Cannot find the process ID\n",programname);
@@ -210,7 +200,6 @@ int main(int argc, char** argv){
  		break;
 
 	}while ( 1 );
-
 	free(text);
 
 	return EXIT_SUCCESS;

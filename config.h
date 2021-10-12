@@ -7,7 +7,8 @@
 #define MAX_TIMEOUT 100
 #define BUFFER_SIZE 400
 #define msgsize 80
-//#define LOGFILE "logmsg.txt"
+#define REQ 1
+
 
 const key_t key_license = 2604;
 const key_t key_childlist = 1708;
