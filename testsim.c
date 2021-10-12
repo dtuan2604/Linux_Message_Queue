@@ -22,143 +22,21 @@ char msg[msgsize];
 char *text = NULL;
 
 
-int getSharedMemory(){
-	int shmid1 = shmget(key_license, sizeof(int), 0666);
-	if(shmid1 < 0){
-                fprintf(stderr,"%s: failed to get id ",programname);
-                perror("Error:");
-                exit(1);
-        }
+int getSharedMemory(); //this function return the number of license
 
-        shared_license = (int *) shmat(shmid1, NULL, 0);
-	if(shared_license == (int *) -1){
-                fprintf(stderr,"%s: failed to get pointer. ",programname);
-                perror("Error");
-                exit(1);
-        }
+void assignmsg(int);
+void generateLog();
+int maxNumber(int);
 
-	int shmid2 = shmget(key_childlist, sizeof(pid_t) * (*shared_license), 0666);
-	if(shmid2 < 0){
-                fprintf(stderr,"%s: failed to get id. ",programname);
-                perror("Error");
-                exit(1);
-        }
+void dt_shm(int*);
+void del_shm(int);
+void deallocateMemory();
+void interrupt_handler();
 
-	childList = (pid_t *) shmat(shmid2, NULL, 0);
-        if(childList == (pid_t *) -1){
-                fprintf(stderr,"%s: failed to get pointer. ",programname);
-                perror("Error");
-                exit(1);
-        }
-	
-	int shmid3 = shmget(key_choosing, sizeof(int) * (*shared_license), 0666);
-        if(shmid3 < 0){
-                fprintf(stderr,"%s: failed to get id. ",programname);
-                perror("Error");
-                exit(1);
-        }
-
-        choosing = (int *) shmat(shmid3, NULL, 0);
-        if(choosing == (int *) -1){
-                fprintf(stderr,"%s: failed to get pointer. ",programname);
-                perror("Error");
-                exit(1);
-        }
-	
-	int shmid4 = shmget(key_number, sizeof(int) * (*shared_license), 0666);
-        if(shmid4 < 0){
-                fprintf(stderr,"%s: failed to get id. ",programname);
-                perror("Error");
-                exit(1);
-        }
-
-        number = (int *) shmat(shmid4, NULL, 0);
-        if(number == (int *) -1){
-                fprintf(stderr,"%s: failed to get pointer. ",programname);
-                perror("Error");
-                exit(1);
-        }
-	int numofProcesses = *shared_license;
-	return numofProcesses; 
-}
-int validNum(char* num){
-        int size = strlen(num);
-        int i = 0;
-        while(i < size){
-                if(!isdigit(num[i]))
-                        return 0;
-                i++;
-        }
-        return 1;
-}
-
-void assignmsg(int currIterate){
-	int k;
-	for(k = 0; k<msgsize; k++){
-		msg[k] = '\0';
-	}
-	
-	char i[5];
-	sprintf(i,"%d",currIterate); 
-	
-	char pid[10];
-	sprintf(pid,"%d",getpid());
-	
-	time_t t = time(NULL);
-	struct tm * local;
-	local = localtime(&t);
-	char ctime[30];
-	strcpy(ctime,asctime(local));
-	ctime[strlen(ctime)-1] = '\0';
-	
-	strcat(msg, ctime);
-	strcat(msg,"\t");
-	strcat(msg, pid);
-        strcat(msg,"\t");
-	strcat(msg, "Iteration #");
-	strcat(msg, i); 
-	strcat(msg, " of ");
-	strcat(msg, repfactor);
-	strcat(msg,"\n");
-	
-	return;
-}
-void generateLog(){
-	int reps = atoi(repfactor);
-	if((text = (char*) malloc(msgsize * reps)) == NULL){
-		fprintf(stderr,"%s: failed to allocate log. ",programname);
-                perror("Error:");
-                exit(1);
-        }
-	
-        int i;
-	for(i = 0; i < reps; i++){
-                sleep(sleeptime);
-                assignmsg(i);
-                strcat(text, msg);
-        }
-
-}
-void handler(){
-	if(text != NULL){
-		free(text);
-	}
-	exit(1);
-}
-int maxNumber(numofProcesses){
-	int i;
-	int max = number[0];
-	
-	for(i = 1; i < numofProcesses; i++){
-		if(max > number[i])
-			max = number[i];
-	}
-	return max;
-}
 int main(int argc, char** argv){
 	programname = argv[0];
 	int i;
-	signal(SIGINT, handler);
+	signal(SIGINT, interrupt_handler);
 	
 	if(argc < 3){
 		fprintf(stderr, "%s: ERROR: Please pass in two positive integer number!\n", programname);
@@ -200,8 +78,157 @@ int main(int argc, char** argv){
  		break;
 
 	}while ( 1 );
-	free(text);
+
+	deallocateMemory();
 
 	return EXIT_SUCCESS;
 
+}
+int getSharedMemory(){
+        int shmid1 = shmget(key_license, sizeof(int), 0666);
+        if(shmid1 < 0){
+                fprintf(stderr,"%s: failed to get id ",programname);
+                perror("Error:");
+                exit(1);
+        }
+
+        shared_license = (int *) shmat(shmid1, NULL, 0);
+        if(shared_license == (int *) -1){
+                fprintf(stderr,"%s: failed to get pointer. ",programname);
+                perror("Error");
+                exit(1);
+        }
+
+        int shmid2 = shmget(key_childlist, sizeof(pid_t) * (*shared_license), 0666);
+        if(shmid2 < 0){
+                fprintf(stderr,"%s: failed to get id. ",programname);
+                perror("Error");
+                exit(1);
+        }
+
+        childList = (pid_t *) shmat(shmid2, NULL, 0);
+        if(childList == (pid_t *) -1){
+                fprintf(stderr,"%s: failed to get pointer. ",programname);
+                perror("Error");
+                exit(1);
+        }
+
+        int shmid3 = shmget(key_choosing, sizeof(int) * (*shared_license), 0666);
+        if(shmid3 < 0){
+                fprintf(stderr,"%s: failed to get id. ",programname);
+                perror("Error");
+                exit(1);
+        }
+
+        choosing = (int *) shmat(shmid3, NULL, 0);
+        if(choosing == (int *) -1){
+                fprintf(stderr,"%s: failed to get pointer. ",programname);
+                perror("Error");
+                exit(1);
+        }
+
+        int shmid4 = shmget(key_number, sizeof(int) * (*shared_license), 0666);
+        if(shmid4 < 0){
+                fprintf(stderr,"%s: failed to get id. ",programname);
+                perror("Error");
+                exit(1);
+        }
+
+        number = (int *) shmat(shmid4, NULL, 0);
+        if(number == (int *) -1){
+                fprintf(stderr,"%s: failed to get pointer. ",programname);
+                perror("Error");
+                exit(1);
+        }
+        int numofProcesses = *shared_license;
+	return numofProcesses;
+}
+void assignmsg(int currIterate){
+        int k;
+        for(k = 0; k<msgsize; k++){
+                msg[k] = '\0';
+        }
+
+        char i[5];
+        sprintf(i,"%d",currIterate);
+
+        char pid[10];
+        sprintf(pid,"%d",getpid());
+
+        time_t t = time(NULL);
+        struct tm * local;
+        local = localtime(&t);
+        char ctime[30];
+        strcpy(ctime,asctime(local));
+        ctime[strlen(ctime)-1] = '\0';
+
+        strcat(msg, ctime);
+        strcat(msg,"\t");
+        strcat(msg, pid);
+        strcat(msg,"\t");
+        strcat(msg, "Iteration #");
+        strcat(msg, i);
+        strcat(msg, " of ");
+        strcat(msg, repfactor);
+        strcat(msg,"\n");
+
+        return;
+}
+void generateLog(){
+        int reps = atoi(repfactor);
+        if((text = (char*) malloc(msgsize * reps)) == NULL){
+                fprintf(stderr,"%s: failed to allocate log. ",programname);
+                perror("Error:");
+                exit(1);
+        }
+
+        int i;
+        for(i = 0; i < reps; i++){
+                sleep(sleeptime);
+                assignmsg(i);
+                strcat(text, msg);
+        }
+
+}
+int maxNumber(int numofProcesses){
+        int i;
+        int max = number[0];
+
+        for(i = 1; i < numofProcesses; i++){
+                if(max > number[i])
+                        max = number[i];
+        }
+        return max;
+}
+void dt_shm(int* shm){
+        int dt_return = shmdt(shm);
+        if(dt_return == -1){
+                fprintf(stderr,"%s: failed to detach. ",programname);
+                perror("Error");
+        }
+        return;
+}
+void del_shm(int shmid){
+        int ctl_return = shmctl(shmid, IPC_RMID, NULL);
+        if(ctl_return == -1){
+                fprintf(stderr,"%s: failed to delete %d. ",programname,shmid);
+                perror("Error");
+        }
+        return;
+}
+void deallocateMemory(){
+	if(shared_license != NULL)
+                dt_shm(shared_license);
+        if(childList != NULL)
+                dt_shm(childList);
+        if(choosing != NULL)
+                dt_shm(choosing);
+        if(number != NULL)
+                dt_shm(number);
+        if(text != NULL)
+                free(text);
+}
+void interrupt_handler(){
+	deallocateMemory();
+	exit(1);
 }

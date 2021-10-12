@@ -16,5 +16,8 @@ const key_t key_choosing = 4508;
 const key_t key_number = 2223;
 
 void logmsg(const char*);
+int validNum(char*); 
+int inRange(char*, int);
+
 
 #endif
